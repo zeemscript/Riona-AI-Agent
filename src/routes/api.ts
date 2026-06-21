@@ -502,13 +502,15 @@ router.post('/scrape-followers', async (req: Request, res: Response) => {
 
 // GET handler for scrape-followers to support file download
 router.get('/scrape-followers', async (req: Request, res: Response) => {
-  const { targetAccount, maxFollowers } = req.query;
+  const { targetAccount, maxFollowers: rawMaxFollowers } = req.query;
+  const parsedMaxFollowers = Number(rawMaxFollowers);
+  const maxFollowers = Number.isFinite(parsedMaxFollowers) && parsedMaxFollowers > 0 ? parsedMaxFollowers : 100;
   const account = (req as any).user.account || 'default';
   const acct = getAccount(account);
   try {
     const result = await scrapeFollowersHandler(
       String(targetAccount),
-      Number(maxFollowers),
+      maxFollowers,
       acct?.username || (req as any).user.username,
       acct?.password,
       account,
@@ -521,7 +523,7 @@ router.get('/scrape-followers', async (req: Request, res: Response) => {
       username: (req as any).user.username,
       details: {
         targetAccount: String(targetAccount),
-        maxFollowers: Number(maxFollowers) || undefined,
+        maxFollowers,
       },
     });
     if (Array.isArray(result)) {
@@ -547,7 +549,8 @@ router.get('/scrape-followers', async (req: Request, res: Response) => {
 
 router.get('/actions', async (req: Request, res: Response) => {
   try {
-    const limit = Number(req.query.limit || 20);
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 20;
     const account = typeof req.query.account === 'string' ? req.query.account : undefined;
     const platform = typeof req.query.platform === 'string' ? req.query.platform : undefined;
     const logs = await listActionLogs({ limit, account, platform });
@@ -560,7 +563,8 @@ router.get('/actions', async (req: Request, res: Response) => {
 
 router.get('/actions/summary', async (req: Request, res: Response) => {
   try {
-    const limit = Number(req.query.limit || 50);
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 50;
     const account = typeof req.query.account === 'string' ? req.query.account : undefined;
     const platform = typeof req.query.platform === 'string' ? req.query.platform : undefined;
     const summary = await getActionSummary({ limit, account, platform });
