@@ -1,0 +1,43 @@
+{
+  "name": "@riona/recaptcha",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Riona reCAPTCHA ML model and solver service",
+  "scripts": {
+    "dev": "ts-node -r tsconfig-paths/register src/scripts/start.ts",
+    "train": "ts-node -r tsconfig-paths/register src/scripts/train.ts",
+    "collect": "ts-node -r tsconfig-paths/register src/scripts/collect_data.ts",
+    "build": "tsc && tsc-alias",
+    "serve": "node dist/scripts/start.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "canvas": "^3.2.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^8.24.1",
+    "multer": "^2.2.0",
+    "openai": "^6.45.0",
+    "playwright": "^1.61.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "socket.io": "^4.8.3",
+    "user-agents": "^2.1.104"
+  },
+  "optionalDependencies": {
+    "@tensorflow/tfjs-node": "^4.22.0"
+  },
+  "devDependencies": {
+    "@riona/tsconfig": "workspace:*",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^26.0.1",
+    "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.17",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.3"
+  }
+}

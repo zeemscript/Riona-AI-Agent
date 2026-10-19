@@ -18,16 +18,23 @@
 - [Feature Summary](#feature-summary)
 - [Planned Expansion](#planned-expansion)
 - [Installation](#installation)
-- [MongoDB Setup](#mongodb-setup)
+- [PostgreSQL Setup](#postgresql-setup)
 - [Usage](#usage)
 - [Dashboard](#dashboard)
 - [Development](#development)
+- [Monorepo](#monorepo)
 - [Guides](#guides)
 - [reCAPTCHA Model](#recaptcha-model)
 - [Configuration Reference](#configuration-reference)
 - [Contributing](#contributing)
 - [License](#license)
 - [Community & Contact](#community--contact)
+- [Multi-Account Support](#multi-account-support)
+- [Project Policies](#project-policies)
+- [Project Structure](#project-structure)
+- [Logging](#logging)
+- [Error Handling](#error-handling)
+- [Stargazers](#stargazers)
 
 ## About
 
@@ -42,7 +49,7 @@ Riona is built to automate social activity while keeping control surfaces explic
 - AI content generation using Gemini for captions and comments
 - Training inputs from YouTube, audio, files, and websites
 - API endpoints, health checks, dashboards, cooldowns, summaries, and logging
-- A separate reCAPTCHA ML subproject under `riona-recaptcha-model/`
+- A separate reCAPTCHA ML app under `apps/recaptcha/` (`@riona/recaptcha`)
 
 ## Quick Links
 
@@ -66,7 +73,7 @@ Before running automation, you can shape the agent with:
 - Instagram automation with cookies, relogin handling, posting, scheduling, and interactions
 - AI-generated captions and comments with schema-guided responses
 - Multi-account and profile-based operation support
-- MongoDB-backed state, summaries, and rate-limiting controls
+- PostgreSQL-backed action logs, summaries, and optional persistence
 - Simple dashboard for runtime health and latest activity
 - Logging, environment validation, and utility scripts for operations
 
@@ -87,48 +94,100 @@ Before running automation, you can shape the agent with:
 
 2. **Install dependencies**:
 
+This is a **pnpm workspace** monorepo. Install [pnpm](https://pnpm.io/installation), then:
+
 ```sh
- npm install
+pnpm install
 ```
 
 3. **Set up environment variables**:
-   Rename the `.env.example` file to `.env` in the root directory and add your Instagram credentials. Refer to the `.env.example` file for the required variables.
+   Copy `.env.example` to `.env` in the **repo root** and add your credentials. All apps read from this file.
 
-## MongoDB Setup (Using Docker)
+## Monorepo
 
-1. **Install Docker**:
-   If you don't have Docker installed, download and install it from the [official website](https://www.docker.com/products/docker-desktop/)
-2. **Run MongoDB using Docker Container**:
-   **Option 1:**
-   `sh     docker run -d -p 27017:27017 --name instagram-ai-mongodb mongodb/mongodb-community-server:latest`  
-    **Option 2:**
-   `sh     docker run -d -p 27017:27017 --name instagram-ai-mongodb -v mongodb_data:/data/db mongodb/mongodb-community-server:latest     `  
-    (Option 2: use this if you want to have like a permanent storage in you so your data won't be lost or remove if you stop or remove your Docker container)
-3. **Modify the MONGODB_URI in the .env file**:
+This repository is a **pnpm workspace** with two apps and shared tooling:
 
-```dotenv
- MONGODB_URI=mongodb://localhost:27017/instagram-ai-agent
+| Package            | Path                 | Description                                 |
+| ------------------ | -------------------- | ------------------------------------------- |
+| `@riona/api`       | `apps/api/`          | Main API, Instagram/X automation, dashboard |
+| `@riona/recaptcha` | `apps/recaptcha/`    | reCAPTCHA ML model & solver                 |
+| `@riona/tsconfig`  | `packages/tsconfig/` | Shared TypeScript config                    |
+
+```sh
+pnpm install              # install all workspace deps
+pnpm dev                  # run API (@riona/api)
+pnpm dev:recaptcha        # run reCAPTCHA app
+pnpm dev:all              # run both in parallel
+pnpm --filter @riona/api <script>   # run any API script
 ```
 
-4. **Verify the connection**:
-   Open a new terminal and run the following command:
-   You should see the MongoDB container running.
-   Docker Commands (Additional Info):
+Full layout, paths, and contributor workflow: [Guides/Monorepo.md](Guides/Monorepo.md).
 
-- To stop the MongoDB container:
-  ```sh
-  docker stop instagram-ai-mongodb
-  ```
-- To start the MongoDB container:
-- To remove the MongoDB container:
-- To remove the MongoDB container and its data:
+## PostgreSQL Setup
+
+The app uses PostgreSQL for action logs. If `DATABASE_URL` is not set, action logs fall back to `apps/api/logs/actionLogs.json`.
+
+### Option A: Docker (recommended for contributors)
+
+```sh
+pnpm db:up
+```
+
+This starts PostgreSQL on port `5432` with credentials that match `.env.example`.
+
+### Option B: Local PostgreSQL
+
+Install PostgreSQL locally, create a database, and point `.env` at it:
+
+```dotenv
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/riona_ai_agent
+```
+
+Create the database if needed:
+
+```sh
+createdb riona_ai_agent
+```
+
+Schema is applied automatically on startup. To run migrations manually:
+
+```sh
+pnpm db:migrate
+```
+
+### Verify
+
+```sh
+docker compose ps
+# or
+psql "$DATABASE_URL" -c '\dt'
+```
+
+Stop Docker Postgres:
+
+```sh
+pnpm db:down
+```
+
+### Upgrading from a MongoDB fork
+
+If your fork still uses `MONGODB_URI`, merge this branch and update `.env`:
+
+1. Remove `MONGODB_URI` / `MONGODB_REQUIRED`
+2. Add `DATABASE_URL` and `DB_REQUIRED=false` (see `.env.example`)
+3. Run `pnpm install`
+4. Start Postgres with `pnpm db:up` or use your local instance
+
+No data migration script is provided — MongoDB action logs were optional and the app still works without a database.
 
 ## Usage
 
 1. **Run the agent**:
 
 ```sh
-npm start
+pnpm start
+# or during development:
+pnpm dev
 ```
 
 This starts the API server on port 3000 and opens the dashboard at `http://localhost:3000/dashboard`. The Instagram browser only launches when you log in or trigger interactions — it does not auto-comment on its own unless `IG_AGENT_ENABLED=true`.
@@ -175,40 +234,52 @@ Then open the dashboard or call `POST /api/interact` with your session cookie to
 
 ## Dashboard
 
-Open `http://localhost:3000/dashboard` for live status and the last IG run summary.
+Open `http://localhost:3000/dashboard` for live status, the last IG run summary, recent
+actions, application logs, and errors.
 
 ## Development
 
-- Run tests: `npm test`
-- Lint: `npm run lint`
-- Format: `npm run format`
-- Env check: `npm run check:env`
-- Setup check: `npm run setup`
+| Command              | Description                                  |
+| -------------------- | -------------------------------------------- |
+| `pnpm check`         | Lint + typecheck + test + format (CI parity) |
+| `pnpm test`          | Run API test suite                           |
+| `pnpm test:coverage` | Tests with coverage report                   |
+| `pnpm lint`          | ESLint on `apps/api`                         |
+| `pnpm format`        | Prettier write                               |
+| `pnpm check:env`     | Validate required env vars                   |
+| `pnpm setup`         | Setup health check                           |
+| `pnpm dev`           | API dev server (`@riona/api`)                |
+| `pnpm dev:recaptcha` | reCAPTCHA dev server                         |
+| `pnpm dev:all`       | All apps in parallel                         |
+| `pnpm build`         | Build all packages                           |
+
+Per-package: `pnpm --filter @riona/api <script>` or `pnpm --filter @riona/recaptcha <script>`.
 
 ## Guides
 
+- [Guides/Monorepo.md](Guides/Monorepo.md) — workspace layout & commands
 - `Guides/Instagram-Bot.md`
 - `Guides/Operations.md`
 - `Guides/API.md`
 - `Guides/Env.md`
 - `Guides/Testing.md`
 - `Guides/CI.md`
-- `Guides/FAQ.md`
-- `Guides/Logging.md`
 - `Guides/Scripts.md`
 - `Guides/Training.md`
+- `Guides/FAQ.md`
+- `Guides/Logging.md`
 
-## reCAPTCHA Model
+## reCAPTCHA Model Integration
 
-This repo now includes the reCAPTCHA model under `riona-recaptcha-model/` and is run via root scripts:
+The reCAPTCHA app lives in `apps/recaptcha/` (`@riona/recaptcha`):
 
-- `npm run recaptcha:dev`
-- `npm run recaptcha:train`
-- `npm run recaptcha:collect`
-- `npm run recaptcha:build`
-- `npm run recaptcha:serve`
+- `pnpm recaptcha:dev` (or `pnpm --filter @riona/recaptcha dev`)
+- `pnpm recaptcha:train`
+- `pnpm recaptcha:collect`
+- `pnpm recaptcha:build`
+- `pnpm recaptcha:serve`
 
-See the separate [riona-recaptcha-model README](./riona-recaptcha-model/README.md) for more details.
+See [apps/recaptcha/README.md](./apps/recaptcha/README.md) for more details.
 
 ## Configuration Reference
 
@@ -229,6 +300,8 @@ See the separate [riona-recaptcha-model README](./riona-recaptcha-model/README.m
 | `IG_COMMENT_ALLOWLIST`   | string  |                                                                        | Comma-separated allowed comment terms          |
 | `IG_COMMENT_DENYLIST`    | string  |                                                                        | Comma-separated blocked comment terms          |
 | `IG_COMMENT_SENTIMENT`   | string  | `any`                                                                  | Sentiment filter: `any`, `positive`, `neutral` |
+| `IG_COMMENT_MIN_LENGTH`  | number  |                                                                        | Minimum allowed comment length (chars)         |
+| `IG_COMMENT_MAX_LENGTH`  | number  |                                                                        | Maximum allowed comment length (chars)         |
 | `IG_AD_MARKERS`          | string  | `sponsored,paid partnership,paid partnership with`                     | Comma-separated ad markers                     |
 | `IG_AD_BUTTON_MARKERS`   | string  | `learn more,shop now,sign up,install now,get offer,subscribe,book now` | Comma-separated ad button markers              |
 
@@ -249,10 +322,10 @@ See the separate [riona-recaptcha-model README](./riona-recaptcha-model/README.m
 
 ### Database
 
-| Variable           | Type    | Default | Description                |
-| ------------------ | ------- | ------- | -------------------------- |
-| `MONGODB_URI`      | string  |         | MongoDB connection URI     |
-| `MONGODB_REQUIRED` | boolean | `false` | Require MongoDB connection |
+| Variable       | Type    | Default | Description                                     |
+| -------------- | ------- | ------- | ----------------------------------------------- |
+| `DATABASE_URL` | string  |         | PostgreSQL connection URL                       |
+| `DB_REQUIRED`  | boolean | `false` | Require PostgreSQL connection (exit if missing) |
 
 ### Logging & General
 
@@ -262,7 +335,7 @@ See the separate [riona-recaptcha-model README](./riona-recaptcha-model/README.m
 
 ## Multi-Account Support
 
-Create `src/config/accounts.json` (not committed) based on `src/config/accounts.example.json`.
+Create `apps/api/src/config/accounts.json` (not committed) based on `apps/api/src/config/accounts.example.json`.
 Then pass `account` in `/api/login` to select which account to use.
 
 ## Project Policies
@@ -274,17 +347,30 @@ Then pass `account` in `/api/login` to select which account to use.
 
 ## Project Structure
 
-- **src/client**: Contains the main logic for interacting with social media platforms like Instagram.
-- **src/config**: Configuration files, including the logger setup.
-- **src/utils**: Utility functions for handling errors, cookies, data saving, etc.
-- **src/Agent**: Contains the AI agent logic and training scripts.
-- **src/Agent/training**: Training scripts for the AI agent.
-- **src/Agent/schema**: Schema definitions for AI-generated content and database models.
-- **src/test**: Contains test data and scripts, such as example tweets.
+```
+apps/
+  api/          @riona/api — REST API, agent loop, IG/X clients, dashboard
+    src/
+      Agent/      AI training, characters, schema
+      client/     Instagram & X/Twitter automation
+      config/     accounts, igProfile, logger, database
+      routes/     Express API (api.ts)
+      services/   action logs, webhooks, metrics, igChallenge
+      views/      Admin dashboard HTML
+    scripts/      env check, setup, DB migrate
+  recaptcha/    @riona/recaptcha — TensorFlow reCAPTCHA solver
+packages/
+  tsconfig/     @riona/tsconfig — shared compiler base
+Guides/         Documentation
+docker-compose.yml
+pnpm-workspace.yaml
+```
+
+See [Guides/Monorepo.md](Guides/Monorepo.md) for paths, runtime directories, and CI details.
 
 ## Logging
 
-The project uses a custom logger to log information, warnings, and errors. Logs are saved in the [logs](http://_vscodecontentref_/3) directory.
+Winston writes rotating logs to `apps/api/logs/`. Set `LOGGER=console` to log only to stdout. See [Guides/Logging.md](Guides/Logging.md).
 
 ## Error Handling
 
@@ -292,7 +378,15 @@ Process-level error handlers are set up to catch unhandled promise rejections, u
 
 ## Contributing
 
-Contributions are welcome! Please fork the repository and submit a pull request with your changes.
+Contributions are welcome and appreciated.
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Install deps: `pnpm install`
+4. Run checks: `pnpm check`
+5. Commit your changes and open a pull request.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [Guides/Monorepo.md](Guides/Monorepo.md).
 
 ## License
 
@@ -313,4 +407,4 @@ Built with ❤️ by David Patrick
 - Twitter: @david_patrick01
 - Email: [davidchuksdev@gmail.com](mailto:davidchuksdev@gmail.com)
 
-Real-time chat is not set up yet. If you want a Discord server, open a discussion and we can spin it up based on interest.
+Real-time community chat is not available yet. If there is sufficient interest, a Discord server may be created in the future. Feel free to open a discussion to express interest.
