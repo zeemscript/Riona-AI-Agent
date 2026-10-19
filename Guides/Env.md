@@ -1,10 +1,18 @@
 # Environment Variables
 
+All variables are defined in **`.env` at the repo root**. `apps/api` loads this file on startup.
+
 ## Required
 
 - `IGusername`
 - `IGpassword`
-- `MONGODB_URI`
+
+## Database (optional)
+
+- `DATABASE_URL` — PostgreSQL connection URL (see `.env.example`)
+- `DB_REQUIRED` — set to `true` to fail startup without a database
+
+If `DATABASE_URL` is unset, action logs use `apps/api/logs/actionLogs.json`.
 
 ## Gemini
 
@@ -24,7 +32,17 @@
 
 ## Multi-account
 
-- `src/config/accounts.json` (see `src/config/accounts.example.json`)
+- `apps/api/src/config/accounts.json` (see `apps/api/src/config/accounts.example.json`)
+
+## Twitter / X API
+
+Required for `POST /api/post-tweet`, engagement routes, and media tweets:
+
+- `TWITTER_API_KEY`
+- `TWITTER_API_SECRET`
+- `TWITTER_ACCESS_TOKEN`
+- `TWITTER_ACCESS_SECRET`
+- `TWITTER_BEARER_TOKEN`
 
 ## Sponsored content filters
 
@@ -45,3 +63,5 @@
 - `IG_COMMENT_ALLOWLIST` (comma-separated)
 - `IG_COMMENT_DENYLIST` (comma-separated)
 - `IG_COMMENT_SENTIMENT` (any | positive | neutral)
+- `IG_COMMENT_MIN_LENGTH` (minimum comment length in characters)
+- `IG_COMMENT_MAX_LENGTH` (maximum comment length in characters)
